@@ -1,0 +1,81 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+    
+    function isEmployee() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'employee';
+    }
+
+    // Users Collection
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(uid);
+      allow update: if isAuthenticated() && (isOwner(uid) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Services Collection
+    match /services/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Portfolio Collection
+    match /portfolio/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Testimonials Collection
+    match /testimonials/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Blogs Collection
+    match /blogs/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Tasks Collection
+    match /tasks/{id} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || resource.data.employeeId == request.auth.uid
+      );
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && (
+        isAdmin() || (resource.data.employeeId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Attendance Collection
+    match /attendance/{id} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || resource.data.employeeId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        isAdmin() || request.resource.data.employeeId == request.auth.uid
+      );
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
